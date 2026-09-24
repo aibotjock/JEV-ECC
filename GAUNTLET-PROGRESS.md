@@ -41,6 +41,11 @@ Per routing event, Jev (TypeSafe AI System One model) estimates a relevance prob
   - 297/297 capabilities scored per event, one batched call, 799/796 ms; hook budget 32/22 ms; 0 eval-errors; state + telemetry landed under the (now honored) `ECC_JEV_STATE_DIR`.
 - Test artifacts cleaned from the operator's real `~/.claude/ecc/jev-switchboard/` after the first run (created before the env override existed).
 
+## Open-and-test walkthrough (real key, default paths, 2026-09-24)
+- `doctor`: key ✓, kill switch ✓, state dir ✓; exposed + fixed a real defect — `defaultRegistryPath()` (CLI/doctor) resolved to `ecc/jev-registry.json` while the runtime used `<stateDir>/jev-registry.json`; now one shared default (`<agentDataRoot>/ecc/jev-switchboard/jev-registry.json`), plugin-root redirect via `ECC_JEV_REGISTRY_PATH` only.
+- `build-registry` → 297 capabilities at the default location (1 honest warning: overlay declares `mcp:context7` with no source capability → marked unavailable).
+- Full live loop at default paths: docker-flavored prompt → ON docker-patterns/deployment-patterns 0.95, security-review 0.76; gate on OFF skill (`command` field — note: `skill_name` is NOT a recognized field, use `command`/`skill_id`/`skill`/`name`) → **exit 2 deny** with relevance-vs-threshold reason + override instruction; gate on ON skill → exit 0 silent pass; override prompt naming the denied capability → next evaluation **LOCKED it (p=0.93)**. Demo state cleaned afterwards; registry cache kept.
+
 ## Environment baseline (measured)
 - `yarn test` at HEAD: **exit 1**, 4905 tests, 26–27 failures in 7 files — plan-canvas-e2e,
   claude-scope-migration, codex-hooks, control-pane, install-apply, install-guided, setup

@@ -396,10 +396,13 @@ if (
 else failed++;
 
 if (
-  test('defaultRegistryPath prefers plugin root, then agent data home, then ~/.claude', () => {
-    assert.strictEqual(defaultRegistryPath({ CLAUDE_PLUGIN_ROOT: '/plugins/ecc', HOME: '/home/tester' }), path.join('/plugins/ecc', 'ecc', 'jev-registry.json'));
-    assert.strictEqual(defaultRegistryPath({ ECC_AGENT_DATA_HOME: '/data/root', HOME: '/home/tester' }), path.join('/data/root', 'ecc', 'jev-registry.json'));
-    assert.strictEqual(defaultRegistryPath({ HOME: '/home/tester' }), path.join('/home/tester', '.claude', 'ecc', 'jev-registry.json'));
+  test('defaultRegistryPath mirrors loadJevConfig: agent data home, then ~/.claude, always under ecc/jev-switchboard', () => {
+    // CLAUDE_PLUGIN_ROOT no longer special-cases the registry location - the
+    // CLI and the runtime evaluator must agree on ONE default cache path.
+    // Operators redirect via ECC_JEV_REGISTRY_PATH or --registry-path.
+    assert.strictEqual(defaultRegistryPath({ CLAUDE_PLUGIN_ROOT: '/plugins/ecc', HOME: '/home/tester' }), path.join('/home/tester', '.claude', 'ecc', 'jev-switchboard', 'jev-registry.json'));
+    assert.strictEqual(defaultRegistryPath({ ECC_AGENT_DATA_HOME: '/data/root', HOME: '/home/tester' }), path.join('/data/root', 'ecc', 'jev-switchboard', 'jev-registry.json'));
+    assert.strictEqual(defaultRegistryPath({ HOME: '/home/tester' }), path.join('/home/tester', '.claude', 'ecc', 'jev-switchboard', 'jev-registry.json'));
   })
 )
   passed++;

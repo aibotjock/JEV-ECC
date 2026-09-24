@@ -85,8 +85,11 @@ function defaultDataRoot(env = process.env) {
 }
 
 function defaultRegistryPath(env = process.env) {
-  const pluginRoot = String(env.CLAUDE_PLUGIN_ROOT || env.ECC_PLUGIN_ROOT || '').trim();
-  return path.join(path.resolve(expandTilde(pluginRoot || defaultDataRoot(env), env)), 'ecc', 'jev-registry.json');
+  // Mirrors loadJevConfig()'s default (<agentDataRoot>/ecc/jev-switchboard) so
+  // the CLI and the runtime evaluator always agree on one cache location.
+  // Operators who want a different location use ECC_JEV_REGISTRY_PATH or the
+  // --registry-path flag (strongest override).
+  return path.join(defaultDataRoot(env), 'ecc', 'jev-switchboard', 'jev-registry.json');
 }
 
 // ---------------------------------------------------------------------------
