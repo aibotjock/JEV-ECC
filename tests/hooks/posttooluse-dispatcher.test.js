@@ -103,13 +103,19 @@ function runTests() {
 
   if (
     test('hooks.json exposes one sync and one async PostToolUse entry', () => {
-      const entries = readHooksConfig(hooksPath).hooks.PostToolUse;
-      assert.strictEqual(entries.length, 2, 'PostToolUse should launch at most two commands');
+      const allEntries = readHooksConfig(hooksPath).hooks.PostToolUse;
+      const entries = allEntries.filter(entry => entry.matcher === '.*');
+      const dedicatedEntries = allEntries.filter(entry => entry.matcher !== '.*');
+      assert.strictEqual(entries.length, 2, 'Wildcard PostToolUse dispatch should launch at most two commands');
       assert.deepStrictEqual(
         entries.map(entry => entry.id),
         ['post:dispatcher:sync', 'post:dispatcher:async']
       );
-      assert.ok(entries.every(entry => entry.matcher === '.*'));
+      assert.deepStrictEqual(
+        dedicatedEntries.map(entry => entry.id),
+        ['post:skill:track-success'],
+        'Matcher-specific PostToolUse routes are dedicated entries outside the dispatchers'
+      );
       assert.strictEqual(entries[0].hooks[0].async, undefined);
       assert.strictEqual(entries[1].hooks[0].async, true);
       assert.ok(entries[0].hooks[0].command.includes('posttooluse-dispatcher.js'));
@@ -124,6 +130,10 @@ function runTests() {
       assert.ok(
         entries.every(entry => !entry.hooks[0].command.includes('ECC_POSTTOOLUSE_PASSTHROUGH')),
         'PostToolUse commands must not opt back into raw stdin passthrough'
+      );
+      assert.ok(
+        dedicatedEntries.every(entry => entry.hooks[0].command.includes('run-with-flags.js')),
+        'Dedicated PostToolUse routes must stay gated by run-with-flags'
       );
       assert.ok(entries[1].hooks[0].timeout >= 30);
     })
@@ -214,7 +224,8 @@ function runTests() {
         'post:ecc-metrics-bridge',
         'post:ecc-context-monitor',
         'post:quality-gate',
-        'post:observe:continuous-learning'
+        'post:observe:continuous-learning',
+        'post:skill:track-success'
       ]);
     })
   )
@@ -620,8 +631,16 @@ function runTests() {
 
       const entries = readHooksConfig(hooksPath).hooks.PostToolUse;
       assert.ok(
-        entries.every(entry => entry.hooks[0].command.includes('require(s).cli()')),
-        'hooks.json must invoke the explicit cli() entrypoint'
+        entries
+          .filter(entry => entry.id.startsWith('post:dispatcher:'))
+          .every(entry => entry.hooks[0].command.includes('require(s).cli()')),
+        'hooks.json dispatchers must invoke the explicit cli() entrypoint'
+      );
+      assert.ok(
+        entries
+          .filter(entry => !entry.id.startsWith('post:dispatcher:'))
+          .every(entry => entry.hooks[0].command.includes('run-with-flags.js')),
+        'hooks.json dedicated routes must go through the require-safe run-with-flags wrapper'
       );
     })
   )

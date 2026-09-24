@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "defaults": {
+    "activationThreshold": 0.65,
+    "deactivationThreshold": 0.35
+  },
+  "capabilities": {
+    "skill:gateguard": {
+      "positiveTriggers": ["editing files", "refactoring across modules", "changing data schemas", "before modifying shared code"],
+      "negativeTriggers": ["read-only question", "conversation without code changes"],
+      "lockable": false,
+      "activationThreshold": 0.5,
+      "deactivationThreshold": 0.2
+    },
+    "skill:security-review": {
+      "positiveTriggers": ["security review", "vulnerability", "exploit", "sanitize untrusted input", "audit code for risk"],
+      "negativeTriggers": ["documentation-only change", "cosmetic formatting"]
+    },
+    "skill:e2e-testing": {
+      "description": "End-to-end test generation and execution workflows.",
+      "positiveTriggers": ["end-to-end test", "e2e flow", "smoke test the app", "verify the full user journey"],
+      "negativeTriggers": ["unit-test-only change", "no runnable app surface"],
+      "dependencies": ["skill:browser-qa"]
+    },
+    "skill:browser-qa": {
+      "positiveTriggers": ["browser automation", "drive a real browser", "verify ui flow", "playwright check"],
+      "negativeTriggers": ["headless library test", "no browser available"]
+    },
+    "mcp:context7": {
+      "description": "Context7 MCP server serving up-to-date library and framework documentation.",
+      "positiveTriggers": ["current library docs", "latest framework API", "check upstream documentation"],
+      "negativeTriggers": ["offline task", "repo-local knowledge suffices"],
+      "conflicts": ["tool:WebSearch"]
+    },
+    "tool:WebSearch": {
+      "description": "Host web search tool for open-ended, open-web lookup.",
+      "positiveTriggers": ["search the web", "latest news", "current events", "find recent releases"],
+      "negativeTriggers": ["local-only task", "offline repository work"],
+      "activationThreshold": 0.7,
+      "deactivationThreshold": 0.3,
+      "conflicts": ["mcp:context7"]
+    },
+    "tool:WebFetch": {
+      "description": "Host fetch tool for reading a specific URL the user or task names.",
+      "positiveTriggers": ["fetch this url", "read this page", "open the linked documentation"],
+      "negativeTriggers": ["no url in scope", "local-only task"],
+      "activationThreshold": 0.7
+    }
+  },
+  "alwaysLocked": ["skill:gateguard"]
+}

@@ -1173,8 +1173,9 @@ This repo is the raw code. The guides explain everything.
 | Verification Loops | Checkpoint vs continuous evals, grader types, pass@k metrics |
 | Parallelization | Git worktrees, cascade method, when to scale instances |
 | Subagent Orchestration | The context problem, iterative retrieval pattern |
+| JEV Capability Switchboard | Probability-based ON/OFF routing of skills, MCPs, and tools via the Jev decision model |
 
-[Commands Quick Reference](./COMMANDS-QUICK-REF.md) | [Manual Adaptation Guide](docs/MANUAL-ADAPTATION-GUIDE.md) | [Troubleshooting FAQ](./TROUBLESHOOTING.md) | [Roadmap](docs/ROADMAP.md)
+[Commands Quick Reference](./COMMANDS-QUICK-REF.md) | [Manual Adaptation Guide](docs/MANUAL-ADAPTATION-GUIDE.md) | [JEV Switchboard Guide](docs/JEV-SWITCHBOARD.md) | [Troubleshooting FAQ](./TROUBLESHOOTING.md) | [Roadmap](docs/ROADMAP.md)
 
 ## Why Choose ECC?
 

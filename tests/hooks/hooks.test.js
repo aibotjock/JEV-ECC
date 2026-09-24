@@ -2729,12 +2729,22 @@ async function runTests() {
 
       assert.strictEqual(preBash.length, 1, 'Should have exactly one PreToolUse Bash dispatcher');
       assert.strictEqual(preBash[0].id, 'pre:bash:dispatcher');
+      const wildcardPostEntries = postEntries.filter(entry => entry.matcher === '.*');
+      const dedicatedPostEntries = postEntries.filter(entry => entry.matcher !== '.*');
       assert.deepStrictEqual(
-        postEntries.map(entry => entry.id),
+        wildcardPostEntries.map(entry => entry.id),
         ['post:dispatcher:sync', 'post:dispatcher:async'],
-        'PostToolUse should have one sync and one async dispatcher'
+        'Wildcard PostToolUse dispatch should stay exactly one sync and one async dispatcher'
       );
-      assert.ok(postEntries.every(entry => entry.matcher === '.*'));
+      assert.deepStrictEqual(
+        dedicatedPostEntries.map(entry => entry.id),
+        ['post:skill:track-success'],
+        'Matcher-specific PostToolUse routes must be dedicated entries, not folded into the dispatchers'
+      );
+      assert.ok(
+        dedicatedPostEntries.every(entry => entry.hooks[0].command.includes(entry.id)),
+        'Dedicated PostToolUse routes should be gated by run-with-flags under their own hook ID'
+      );
 
       const preCommand = Array.isArray(preBash[0].hooks[0].command) ? preBash[0].hooks[0].command.join(' ') : preBash[0].hooks[0].command;
 
@@ -2779,7 +2789,9 @@ async function runTests() {
         'PreToolUse governance matcher should include PowerShell'
       );
       assert.ok(
-        hooks.hooks.PostToolUse.every(entry => entry.matcher === '.*'),
+        hooks.hooks.PostToolUse
+          .filter(entry => entry.id.startsWith('post:dispatcher:'))
+          .every(entry => entry.matcher === '.*'),
         'Top-level PostToolUse dispatchers should preserve current-main wildcard matchers'
       );
     })

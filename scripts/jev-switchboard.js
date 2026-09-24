@@ -1,0 +1,357 @@
+#!/usr/bin/env node
+'use strict';
+
+/**
+ * JEV capability switchboard CLI (docs/JEV-SWITCHBOARD.md).
+ *
+ *   build-registry   derive the capability registry and write the cache
+ *   status           print the ON/OFF/LOCKED table for one session
+ *   doctor           health checks: api key, registry cache freshness, state writability
+ *
+ * Pure node, zero dependencies beyond the repo's existing libs. No network:
+ * the Jev HTTP call belongs to the detached evaluator (eval-runner), never to
+ * a CLI or hook process.
+ */
+
+const fs = require('fs');
+const path = require('path');
+const {
+  REGISTRY_SCHEMA_VERSION,
+  buildRegistry,
+  loadRegistry,
+  writeRegistryCache,
+  readRegistryCache,
+  defaultRepoRoot,
+  defaultOverlayPath,
+  defaultDataRoot,
+  defaultRegistryPath
+} = require('./lib/jev-switchboard/registry');
+const { writeFileAtomic } = require('./lib/atomic-write');
+
+const COMMANDS = ['build-registry', 'status', 'doctor'];
+const PENDING_COMMANDS = ['eval'];
+
+function usage() {
+  return [
+    'Usage: jev-switchboard <command> [options]',
+    '',
+    'Commands:',
+    '  build-registry   Derive the capability registry (skills + MCPs + overlay',
+    '                   tool opt-ins), merge routing metadata, write the cache.',
+    '  status           Print the ON/OFF/LOCKED capability table for a session.',
+    '  doctor           Check api key, registry cache freshness, state writability.',
+    '  eval             (planned) run one routing evaluation; not implemented yet.',
+    '',
+    'Options:',
+    '  --repo-root <path>     Repository root to derive from (default: this repo)',
+    '  --overlay <path>       Routing overlay JSON (default: <repoRoot>/config/jev-switchboard-routing.json)',
+    '  --registry-path <path> Registry cache path (env ECC_JEV_REGISTRY_PATH)',
+    '  --state-dir <dir>      Session state directory (env ECC_JEV_STATE_DIR)',
+    '  --session <key>        Session key for status (default: default)',
+    '  --json                 Print machine-readable JSON (build-registry)',
+    '  -h, --help             Show this help',
+    '',
+    'Exit codes: 0 success, 1 usage or operational error.'
+  ].join('\n');
+}
+
+function parseArgs(argv = process.argv) {
+  const args = argv.slice(2);
+  const valueFlags = {
+    '--repo-root': 'repoRoot',
+    '--overlay': 'overlay',
+    '--registry-path': 'registryPath',
+    '--state-dir': 'stateDir',
+    '--session': 'session'
+  };
+  const options = { repoRoot: null, overlay: null, registryPath: null, stateDir: null, session: null, json: false, help: false };
+  let command = null;
+  let error = null;
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '-h' || arg === '--help') {
+      options.help = true;
+      continue;
+    }
+    if (arg === '--json') {
+      options.json = true;
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(valueFlags, arg)) {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith('--')) {
+        error = `missing value for ${arg}`;
+        break;
+      }
+      options[valueFlags[arg]] = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      error = `unknown option: ${arg}`;
+      break;
+    }
+    if (command === null) {
+      command = arg;
+      continue;
+    }
+    error = `unexpected argument: ${arg}`;
+    break;
+  }
+
+  if (!error && command !== null && !COMMANDS.includes(command) && !PENDING_COMMANDS.includes(command)) {
+    error = `unknown command: ${command}`;
+  }
+  return { command, options, error };
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function compareStrings(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function firstLine(text) {
+  return String(text || '').split(/\r?\n/)[0];
+}
+
+function fromEnvOrFlag(flagValue, envName) {
+  if (flagValue) return String(flagValue);
+  const fromEnv = String(process.env[envName] || '').trim();
+  return fromEnv || null;
+}
+
+function resolveRegistryPath(options) {
+  return path.resolve(fromEnvOrFlag(options.registryPath, 'ECC_JEV_REGISTRY_PATH') || defaultRegistryPath());
+}
+
+function resolveStateDir(options) {
+  const explicit = fromEnvOrFlag(options.stateDir, 'ECC_JEV_STATE_DIR');
+  return path.resolve(explicit || path.join(defaultDataRoot(), 'ecc', 'jev-switchboard'));
+}
+
+// Session keys are embedded in file names; keep the character set closed so a
+// hostile session id cannot traverse out of the state directory.
+function sanitizeSessionKey(session) {
+  const cleaned = String(session || 'default').replace(/[^A-Za-z0-9._-]/g, '_');
+  return cleaned || 'default';
+}
+
+function stateFilePath(stateDir, session) {
+  return path.join(stateDir, `state-${sanitizeSessionKey(session)}.json`);
+}
+
+function readStateFile(filePath) {
+  let raw;
+  try {
+    raw = fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return isPlainObject(parsed) && isPlainObject(parsed.states) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeStateValue(value) {
+  return value === 'ON' || value === 'OFF' || value === 'LOCKED' ? value : 'OFF';
+}
+
+function formatProbability(recorded) {
+  if (recorded && typeof recorded.lastProbability === 'number' && Number.isFinite(recorded.lastProbability)) {
+    return recorded.lastProbability.toFixed(2);
+  }
+  return '-';
+}
+
+function cmdBuildRegistry(options) {
+  const repoRoot = path.resolve(options.repoRoot || defaultRepoRoot());
+  const overlayPath = options.overlay ? path.resolve(options.overlay) : defaultOverlayPath(repoRoot);
+  const registry = buildRegistry({ repoRoot, overlayPath });
+  const registryPath = writeRegistryCache(registry, { registryPath: resolveRegistryPath(options) });
+
+  if (options.json) {
+    console.log(JSON.stringify(registry, null, 2));
+    return 0;
+  }
+
+  const { counts, warnings } = registry.buildSummary;
+  const plural = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+  console.log(`JEV switchboard registry (${REGISTRY_SCHEMA_VERSION})`);
+  console.log(`  ${plural(counts.skill, 'skill')}, ${plural(counts.mcp, 'mcp')}, ${plural(counts.tool, 'tool')} — ${counts.total} capabilities`);
+  console.log(`  alwaysLocked: ${registry.alwaysLocked.length > 0 ? registry.alwaysLocked.join(', ') : '(none)'}`);
+  console.log(`  cache: ${registryPath}`);
+  if (warnings.length === 0) {
+    console.log('  warnings: none');
+  } else {
+    console.log(`  warnings (${warnings.length}):`);
+    for (const warning of warnings) console.log(`    - ${warning}`);
+  }
+  return 0;
+}
+
+function cmdStatus(options) {
+  const session = sanitizeSessionKey(options.session);
+  const stateDir = resolveStateDir(options);
+  const stateFile = stateFilePath(stateDir, session);
+
+  let registry;
+  try {
+    registry = loadRegistry({
+      registryPath: resolveRegistryPath(options),
+      repoRoot: options.repoRoot ? path.resolve(options.repoRoot) : undefined,
+      overlayPath: options.overlay ? path.resolve(options.overlay) : undefined
+    }).registry;
+  } catch (error) {
+    process.stderr.write(`Error: cannot load registry: ${firstLine(error.message)}\n`);
+    return 1;
+  }
+
+  const state = readStateFile(stateFile);
+  const fileStates = state ? state.states : {};
+  const alwaysLocked = new Set(registry.alwaysLocked);
+  const capabilityIds = new Set(registry.capabilities.map(capability => capability.id));
+  const ids = Array.from(new Set([...capabilityIds, ...Object.keys(fileStates)])).sort(compareStrings);
+
+  console.log(`JEV switchboard status (session: ${session})`);
+  console.log(`  registry: ${registry.buildSummary.counts.total} capabilities (${registry.capabilities.filter(c => !c.available).length} unavailable)`);
+  if (state) {
+    console.log(`  state file: ${stateFile} — seq ${typeof state.seq === 'number' ? state.seq : '?'}, event ${typeof state.event === 'string' ? state.event : '?'}`);
+  } else {
+    console.log(`  state file: ${stateFile} — not found (never evaluated; gates pass-through, capabilities default OFF)`);
+  }
+
+  const rows = ids.map(id => {
+    const locked = alwaysLocked.has(id);
+    const recorded = isPlainObject(fileStates[id]) ? fileStates[id] : null;
+    return {
+      stateValue: locked ? 'LOCKED' : normalizeStateValue(recorded && recorded.state),
+      label: capabilityIds.has(id) ? id : `${id} (unregistered)`,
+      probability: formatProbability(recorded)
+    };
+  });
+  const labelWidth = Math.min(Math.max(...rows.map(row => row.label.length), 12), 64);
+  console.log(`  ${'STATE'.padEnd(8)}${'CAPABILITY'.padEnd(labelWidth + 2)}P`);
+  for (const row of rows) console.log(`  ${row.stateValue.padEnd(8)}${row.label.padEnd(labelWidth + 2)}${row.probability}`);
+  return 0;
+}
+
+function cmdDoctor(options) {
+  const lines = [];
+  const ok = message => lines.push(`  [ok]    ${message}`);
+  const warn = message => lines.push(`  [warn]  ${message}`);
+
+  // 1. API key presence (value is never printed).
+  const apiKey = String(process.env.TYPESAFE_API_KEY || '').trim();
+  if (apiKey.length > 0) {
+    ok('api key present (TYPESAFE_API_KEY)');
+  } else {
+    warn('api key missing (TYPESAFE_API_KEY) — Jev evaluation disabled; gates pass-through');
+  }
+
+  const killSwitch = String(process.env.ECC_JEV_ENABLED === undefined ? '' : process.env.ECC_JEV_ENABLED)
+    .trim()
+    .toLowerCase();
+  if (['0', 'false', 'no', 'off'].includes(killSwitch)) {
+    warn('kill switch active (ECC_JEV_ENABLED=false) — switchboard disabled');
+  } else {
+    ok('kill switch inactive');
+  }
+
+  // 2. Registry cache freshness: cache must exist, parse, and deep-match a live
+  //    derivation (buildRegistry is deterministic, so equality is exact).
+  const repoRoot = path.resolve(options.repoRoot || defaultRepoRoot());
+  const overlayPath = options.overlay ? path.resolve(options.overlay) : defaultOverlayPath(repoRoot);
+  const registryPath = resolveRegistryPath(options);
+  let derived = null;
+  try {
+    derived = buildRegistry({ repoRoot, overlayPath });
+  } catch (error) {
+    warn(`cannot derive live registry: ${firstLine(error.message)}`);
+  }
+  if (derived) {
+    const cached = readRegistryCache(registryPath);
+    if (cached) {
+      if (JSON.stringify(cached) === JSON.stringify(derived)) {
+        ok(`registry cache fresh (${derived.buildSummary.counts.total} capabilities)`);
+      } else {
+        warn(`registry cache stale at ${registryPath} — run: node scripts/jev-switchboard.js build-registry`);
+      }
+    } else if (fs.existsSync(registryPath)) {
+      warn(`registry cache corrupt at ${registryPath} — run: node scripts/jev-switchboard.js build-registry`);
+    } else {
+      warn(`registry cache missing at ${registryPath} — run: node scripts/jev-switchboard.js build-registry`);
+    }
+  }
+
+  // 3. State file writability (probe write + remove; same atomic path the
+  //    eval-runner uses).
+  const stateDir = resolveStateDir(options);
+  try {
+    fs.mkdirSync(stateDir, { recursive: true });
+    const probe = path.join(stateDir, `.doctor-probe-${process.pid}`);
+    writeFileAtomic(probe, '', { mode: 0o600 });
+    fs.rmSync(probe, { force: true });
+    ok(`state dir writable (${stateDir})`);
+  } catch (error) {
+    warn(`state dir not writable (${stateDir}: ${firstLine(error.message)})`);
+  }
+
+  console.log('JEV switchboard doctor');
+  for (const line of lines) console.log(line);
+  return 0;
+}
+
+function main(argv = process.argv) {
+  const { command, options, error } = parseArgs(argv);
+  if (error) {
+    process.stderr.write(`Error: ${error}\n\n${usage()}\n`);
+    return 1;
+  }
+  if (options.help) {
+    console.log(usage());
+    return 0;
+  }
+  if (!command) {
+    process.stderr.write(`${usage()}\n`);
+    return 1;
+  }
+  if (PENDING_COMMANDS.includes(command)) {
+    process.stderr.write(`Error: '${command}' is not implemented yet (planned for the evaluator piece)\n`);
+    return 1;
+  }
+
+  try {
+    if (command === 'build-registry') return cmdBuildRegistry(options);
+    if (command === 'status') return cmdStatus(options);
+    if (command === 'doctor') return cmdDoctor(options);
+  } catch (error) {
+    process.stderr.write(`Error: ${firstLine(error && error.message ? error.message : String(error))}\n`);
+    return 1;
+  }
+
+  process.stderr.write(`Error: unknown command: ${command}\n\n${usage()}\n`);
+  return 1;
+}
+
+if (require.main === module) {
+  process.exit(main());
+}
+
+module.exports = {
+  main,
+  parseArgs,
+  usage,
+  cmdBuildRegistry,
+  cmdStatus,
+  cmdDoctor,
+  resolveStateDir,
+  stateFilePath,
+  sanitizeSessionKey
+};

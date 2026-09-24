@@ -46,6 +46,16 @@
         "id": "pre:edit-write:gateguard-fact-force",
         "description": "Fact-forcing gate: block first Edit/Write/MultiEdit per file and demand investigation (importers, data schemas, user instruction) before allowing",
         "fingerprint": "32c4a312b4c2"
+      },
+      {
+        "id": "pre:skill:jev-gate",
+        "description": "JEV switchboard Skill gate: deny Skill invocations the router turned OFF (cached state only)",
+        "fingerprint": "fe0b3ae202f4"
+      },
+      {
+        "id": "pre:tool:jev-gate",
+        "description": "JEV switchboard tool gate: deny MCP and overlay-regulated tools the router turned OFF (cached state only)",
+        "fingerprint": "f96ce2e8d66d"
       }
     ],
     "PreCompact": [
@@ -77,6 +87,11 @@
         "id": "post:dispatcher:async",
         "description": "Run background PostToolUse hooks in one process while preserving per-hook controls",
         "fingerprint": "01af98da6841"
+      },
+      {
+        "id": "post:skill:track-success",
+        "description": "Record successful Skill invocations for skill-health telemetry (success side of the tracker; failures were already wired)",
+        "fingerprint": "c47dee65f6d4"
       }
     ],
     "PostToolUseFailure": [
@@ -89,6 +104,11 @@
         "id": "post:skill:track",
         "description": "Record hard Skill tool failures for skill-health telemetry",
         "fingerprint": "a4dbe0729f30"
+      },
+      {
+        "id": "post-failure:jev-reeval",
+        "description": "JEV switchboard failure re-evaluation: refresh capability states with a failure signal (detached evaluator)",
+        "fingerprint": "3abd3dea9ac8"
       }
     ],
     "Stop": [
@@ -126,6 +146,11 @@
         "id": "stop:desktop-notify",
         "description": "Send desktop notification (macOS/WSL) with task summary when Claude responds",
         "fingerprint": "7a492e898bf6"
+      },
+      {
+        "id": "stop:jev-reeval",
+        "description": "JEV switchboard Stop re-evaluation: refresh capability states when the turn ends (detached evaluator)",
+        "fingerprint": "db9aad81ffed"
       }
     ],
     "SessionEnd": [
@@ -133,6 +158,13 @@
         "id": "session:end:marker",
         "description": "Session end lifecycle marker (non-blocking)",
         "fingerprint": "9270863f2935"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "id": "user-prompt:jev-route",
+        "description": "JEV switchboard router: schedule a detached capability evaluation for the submitted prompt (no network in-hook)",
+        "fingerprint": "9ef6c2d40113"
       }
     ]
   }
