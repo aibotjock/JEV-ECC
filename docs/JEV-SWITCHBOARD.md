@@ -134,7 +134,10 @@ never-evaluated). Gates deny only what a successful evaluation or hard rule has 
 
 ## CLI
 
-`node scripts/jev-switchboard.js build-registry | eval | status | doctor`.
+`node scripts/jev-switchboard.js build-registry | eval | calibrate | status | doctor`.
+
+- `eval` — run one routing evaluation in-process (same config chain as hooks: `ECC_JEV_STATE_DIR`, `ECC_JEV_REGISTRY_PATH`, `TYPESAFE_API_KEY`); `--prompt`, `--event user-prompt|stop|tool-failure`, `--session`, `--tool-name`, `--error-message`, `--json`.
+- `calibrate` — summarize `telemetry.jsonl` into per-capability probability stats, hysteresis-band occupancy, ON/OFF flip counts, and threshold recommendations; warns below 10 events. Decision rows carry the destination state's `reason`, so hard-rule/explicit-request locks are distinguishable from threshold transitions.
 
 ## Security
 

@@ -201,7 +201,15 @@ async function runEvaluation(payload, options = {}) {
         event: source.event,
         sessionKey,
         probabilities: evaluated.probabilities,
-        decisions: decision.changes,
+        // Change rows carry the destination state's reason so downstream
+        // consumers (calibrate's explicitLocks) can classify hard-rule locks;
+        // the controller's bare {id, from, to} shape stays forward-compatible.
+        decisions: decision.changes.map(change => {
+          const state = decision.states && decision.states[change.id];
+          return state && typeof state.reason === 'string' && state.reason
+            ? { ...change, reason: state.reason }
+            : { ...change };
+        }),
         latencyMs: evaluated.latencyMs,
         model: evaluated.model,
         usage: evaluated.usage,

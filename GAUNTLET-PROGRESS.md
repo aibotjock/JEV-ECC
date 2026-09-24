@@ -33,6 +33,7 @@ Per routing event, Jev (TypeSafe AI System One model) estimates a relevance prob
 | 6 | Docs/README/.env.example + validator chain + full-suite diff | **done** | – | validators 30 matchers + schema-keys + unicode green; README Guides row + .env.example TYPESAFE_API_KEY; failure list identical to baseline |
 | — | Critic-named gap fixes (client/registry/controller) | **done** | – | 17+23+21 tests; full 10-file regression green; eslint clean |
 | — | Piece-5 critic gap fixes + live-E2E finds | **done** | – | payload unlink after consume; lock ownership tokens (stolen-lock release refused); bounded stdin in jev-reeval/jev-failure-reeval; absent-answer→KEEP pinned at eval-runner level; ECC_JEV_STATE_DIR/ECC_JEV_REGISTRY_PATH implemented in config.js (was CLI-help-documented but unimplemented on the hook path — found live) |
+| 7 | `eval` + `calibrate` CLI (builder→critic round) | **done** | 1 | critic verdict "fix-first": tilde-path data split (DEMONSTRATED) + dead EXPLICIT LOCKS column — both fixed, re-tested, suite clean |
 
 ## Live end-to-end (real key, 2026-09-24)
 - Two routing events through the real hook → detached evaluator → Jev `jev-1.13.0`:
@@ -40,6 +41,21 @@ Per routing event, Jev (TypeSafe AI System One model) estimates a relevance prob
   - `skill:gateguard` LOCKED by security policy both runs (alwaysLocked overlay works).
   - 297/297 capabilities scored per event, one batched call, 799/796 ms; hook budget 32/22 ms; 0 eval-errors; state + telemetry landed under the (now honored) `ECC_JEV_STATE_DIR`.
 - Test artifacts cleaned from the operator's real `~/.claude/ecc/jev-switchboard/` after the first run (created before the env override existed).
+
+## Live-plugin integration test (real claude session, 2026-09-24)
+- Isolated harness (scratch CLAUDE_CONFIG_DIR + ECC_AGENT_DATA_HOME, auth env copied, jev-route wired as a settings-level UserPromptSubmit hook with absolute paths) → `claude -p "…docker compose postgres…"` v2.1.282, headless.
+- **The hook fired inside the real session**: registry auto-derived on cache miss in the isolated dir, one batched evaluation with the real key, state + telemetry written under the session's real UUID, model answered normally (hook never interfered).
+- Decisions for the postgres prompt: docker-patterns 0.93 ON, documentation-lookup 0.66 ON, gateguard LOCKED, 294 OFF, 297/297 scored, 0 eval-errors.
+- Latency honesty: 1097 ms this sample — the only one of four above the 1 s target, taken while cold-cache registry derivation ran concurrently (other three: 796/799/799 ms). Watch p95 as telemetry accumulates; the detached design means it never blocks the prompt either way.
+- Harness cleaned afterwards. `context7` doctor warning verdict: correct-by-design — the overlay regulates it IF installed; this box doesn't have it, so unavailable is the honest state. No change.
+- NOT yet done: installing ECC as a packaged plugin in the operator's LIVE ~/.claude (user decision; settings-level wiring proven equivalent for the switchboard path).
+
+## eval + calibrate round (2026-09-24)
+- Builder: `eval` (in-process runEvaluation; --prompt/--event/--session/--tool-name/--error-message/--json; exit 0 ok/skip, 1 usage/error; key never printed) + `calibrate` (new pure `calibration.js`: per-capability samples/meanP/on-off-locked/band/flips/explicitLocks + 3 recommendation rules + <10-event warning; CLI table + --json). 20/20 CLI + 13/13 calibration tests, eslint clean; builder proved the 27 baseline failures pre-exist via stash-and-rerun.
+- Fresh-context critic: **fix-first** — (1) DEMONSTRATED tilde split: `ECC_JEV_STATE_DIR='~/x'` made eval write `<cwd>/~/x` while hooks/calibrate read `$HOME/x`; (2) EXPLICIT LOCKS structurally dead on real data (controller change rows carry no reason). Also: stray-file forensics (`.tmp-validator-*` = interrupted validator-test debris; gitignored now), docs CLI list stale.
+- Fixes applied + tested: tilde expansion in CLI resolvers (flag AND env forms, e2e test pins no `<cwd>/~` creation), telemetry decision rows now carry the destination reason (emitter-side, one map — threshold-on and hard-rule locks both distinguishable; pinned by test), eval mkdirs the state dir, pluralized counts, reworded band recommendation, docs + .gitignore updated. Full suite: 5087/5111, 27 failures = exactly the documented baseline set.
+- Live smoke (real key, default paths): `eval --session smoke` → 297 capabilities, 894 ms, 25 state changes, stack-appropriate ONs; `calibrate` → real table + warning at 1 event. Telemetry corpus at the default location starts here — threshold tuning becomes possible as it accumulates.
+- Remaining (post-v1): packaged-plugin install in live ~/.claude (user decision), threshold tuning from accumulated telemetry (tooling now exists), v2 candidates (skill-dir materialization, MCP config rewriting as appliers).
 
 ## Open-and-test walkthrough (real key, default paths, 2026-09-24)
 - `doctor`: key ✓, kill switch ✓, state dir ✓; exposed + fixed a real defect — `defaultRegistryPath()` (CLI/doctor) resolved to `ecc/jev-registry.json` while the runtime used `<stateDir>/jev-registry.json`; now one shared default (`<agentDataRoot>/ecc/jev-switchboard/jev-registry.json`), plugin-root redirect via `ECC_JEV_REGISTRY_PATH` only.
