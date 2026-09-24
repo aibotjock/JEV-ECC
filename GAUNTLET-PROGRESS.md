@@ -57,4 +57,5 @@ Per routing event, Jev (TypeSafe AI System One model) estimates a relevance prob
   thresholds 0.65/0.35 default, one compatibility fix (success-side skill telemetry wiring).
 - Round-1 blind sides: client ours=A, registry ours=B, controller ours=A (critic uninformed).
 - 2026-09-24 (piece 5 re-judged after the 429 kill): ours=A, bar=B; critic picked A — "fail-hold verified E2E against a refused port; B runs blocking probes inside the sync hook" — with 4 named gaps, all fixed same round (payload unlink, lock ownership tokens, bounded stdin in both reeval hooks, absent-answer→KEEP coverage).
+- 2026-09-24: PUSHED to `git@github.com:aibotjock/JEV-ECC.git` (remote `jev-ecc`, user-directed destination; force-with-lease over the 1-commit scaffold stub 0449d827 with user approval). Remote main = ff461851. `origin` (aibotjock/ECC) untouched.
 - Live E2E surfaced one real defect the critics missed: ECC_JEV_STATE_DIR/ECC_JEV_REGISTRY_PATH were documented in CLI help but unimplemented in config.js (hooks wrote to the default dir regardless). Implemented env>default in config.js with tilde expansion + tests; CLI flags remain the strongest override for CLI-owned operations.
