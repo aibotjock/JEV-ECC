@@ -26,8 +26,8 @@ const DEFAULTS = Object.freeze({
   enabled: true,
   model: 'jev-1.13.0',
   baseUrl: 'https://api.typesafe.ai',
-  activationThreshold: 0.65,
-  deactivationThreshold: 0.35,
+  activationThreshold: 0.85,
+  deactivationThreshold: 0.49,
   timeoutMs: 8000,
   maxRetries: 2,
 });
