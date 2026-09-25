@@ -1,16 +1,14 @@
 {
   "version": 1,
   "defaults": {
-    "activationThreshold": 0.65,
-    "deactivationThreshold": 0.35
+    "activationThreshold": 0.85,
+    "deactivationThreshold": 0.49
   },
   "capabilities": {
     "skill:gateguard": {
       "positiveTriggers": ["editing files", "refactoring across modules", "changing data schemas", "before modifying shared code"],
       "negativeTriggers": ["read-only question", "conversation without code changes"],
-      "lockable": false,
-      "activationThreshold": 0.5,
-      "deactivationThreshold": 0.2
+      "lockable": false
     },
     "skill:security-review": {
       "positiveTriggers": ["security review", "vulnerability", "exploit", "sanitize untrusted input", "audit code for risk"],
@@ -36,15 +34,12 @@
       "description": "Host web search tool for open-ended, open-web lookup.",
       "positiveTriggers": ["search the web", "latest news", "current events", "find recent releases"],
       "negativeTriggers": ["local-only task", "offline repository work"],
-      "activationThreshold": 0.7,
-      "deactivationThreshold": 0.3,
       "conflicts": ["mcp:context7"]
     },
     "tool:WebFetch": {
       "description": "Host fetch tool for reading a specific URL the user or task names.",
       "positiveTriggers": ["fetch this url", "read this page", "open the linked documentation"],
-      "negativeTriggers": ["no url in scope", "local-only task"],
-      "activationThreshold": 0.7
+      "negativeTriggers": ["no url in scope", "local-only task"]
     }
   },
   "alwaysLocked": ["skill:gateguard"]
