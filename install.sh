@@ -27,8 +27,17 @@ fi
 # like G:\g\projects\... that results from Git Bash's auto path conversion.
 if command -v cygpath &>/dev/null; then
     NODE_SCRIPT="$(cygpath -w "$SCRIPT_DIR/scripts/install-apply.js")"
+    RUNTIME_DEPS_SCRIPT="$(cygpath -w "$SCRIPT_DIR/scripts/install-runtime-deps.js")"
 else
     NODE_SCRIPT="$SCRIPT_DIR/scripts/install-apply.js"
+    RUNTIME_DEPS_SCRIPT="$SCRIPT_DIR/scripts/install-runtime-deps.js"
 fi
 
-exec node "$NODE_SCRIPT" "$@"
+# Apply the requested install first. With `set -e`, a failed installer exits
+# immediately and we never attempt the dependency step.
+node "$NODE_SCRIPT" "$@"
+
+# Claude hook-runtime files are copied out of the source repo. Install their
+# production dependencies into the destination so copied hooks can resolve
+# modules such as js-yaml without NODE_PATH or the original source checkout.
+node "$RUNTIME_DEPS_SCRIPT" "$@"
