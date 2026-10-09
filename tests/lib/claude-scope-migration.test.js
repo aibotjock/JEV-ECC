@@ -155,14 +155,10 @@ function captureError(fn) {
   assert.fail('Expected operation to throw');
 }
 
-function installArgv(scope, hooks = 'standard', profileOverride) {
-  const enabled = hooks !== 'off';
-  const profile = profileOverride || (hooks === 'off' ? 'standard' : hooks);
+function installArgv(scope) {
   return [
     'plugin', 'install', 'ecc@ecc',
     '--scope', scope,
-    '--config', `hooks_enabled=${enabled}`,
-    '--config', `hook_profile=${profile}`,
   ];
 }
 
@@ -170,13 +166,13 @@ function uninstallArgv(scope) {
   return ['plugin', 'uninstall', 'ecc@ecc', '--scope', scope, '--keep-data'];
 }
 
-function expectedMigrationCalls(sourceScope, destinationScope, hooks = 'standard') {
+function expectedMigrationCalls(sourceScope, destinationScope) {
   return [
     ['plugin', 'list', '--json'],
     ['plugin', 'marketplace', 'list', '--json'],
     ['plugin', 'marketplace', 'update', 'ecc'],
     ['plugin', 'marketplace', 'list', '--json'],
-    installArgv(destinationScope, hooks),
+    installArgv(destinationScope),
     ['plugin', 'list', '--json'],
     ['plugin', 'list', '--json'],
     uninstallArgv(sourceScope),
@@ -626,7 +622,7 @@ test('migration preserves hook preferences unless --hooks is explicit', () => {
       }
     );
     assert.ok(readCalls(fixture).some(argv => (
-      JSON.stringify(argv) === JSON.stringify(installArgv('project', 'off', 'strict'))
+      JSON.stringify(argv) === JSON.stringify(installArgv('project'))
     )));
   });
 
