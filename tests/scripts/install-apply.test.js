@@ -1151,9 +1151,13 @@ function runTests() {
       assert.strictEqual(settings.includeCoAuthoredBy, false, 'Claude co-author attribution should be disabled by default');
       assert.deepStrictEqual(settings.env, { MY_VAR: '1' }, 'existing env should be preserved');
       assert.deepStrictEqual(
-        settings.hooks.UserPromptSubmit,
-        [{ matcher: '*', hooks: [{ type: 'command', command: 'echo custom-submit' }] }],
+        settings.hooks.UserPromptSubmit[0],
+        { matcher: '*', hooks: [{ type: 'command', command: 'echo custom-submit' }] },
         'unrelated existing hooks should be preserved'
+      );
+      assert.ok(
+        settings.hooks.UserPromptSubmit.some(entry => entry.id === 'user-prompt:jev-route'),
+        'managed JEV hook should be registered alongside the user hook'
       );
       assert.deepStrictEqual(
         settings.hooks.PreToolUse[0],
@@ -1190,6 +1194,7 @@ function runTests() {
       process.env.ECC_DISABLED_MCPS = 'github,memory';
 
       applyInstallPlan({
+        adapter: { id: 'test-install', target: 'cursor', kind: 'project' },
         targetRoot: path.join(tempDir, 'installed'),
         installStatePath,
         statePreview: {

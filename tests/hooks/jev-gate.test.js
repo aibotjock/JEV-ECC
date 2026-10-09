@@ -113,7 +113,9 @@ function runTests() {
         writeRegistryCache(stateDir, registryCaps());
         writeStateFile(stateDir, 'sess1', { 'skill:code-review': OFF_REVIEW });
         const input = { session_id: 'sess1', tool_name: 'Skill', tool_input: { skill: 'code-review' } };
-        const result = runHook(input, baseEnv(home));
+        // The diagnostic fixture uses an explicit threshold; production defaults
+        // may change without changing the deny contract.
+        const result = runHook(input, baseEnv(home, { ECC_JEV_ACTIVATION_THRESHOLD: '0.65', ECC_JEV_DEACTIVATION_THRESHOLD: '0.35' }));
 
         assert.strictEqual(result.code, 2, `expected exit 2, got ${result.code} (${result.stderr})`);
         assert.strictEqual(result.stdout, JSON.stringify(input), 'raw input must be echoed back like mcp-health-check');

@@ -99,6 +99,10 @@ function runTests() {
       fs.mkdirSync(binDir, { recursive: true });
       fs.mkdirSync(scriptsDir, { recursive: true });
       fs.copyFileSync(SCRIPT, fixtureScript);
+      fs.copyFileSync(
+        path.join(path.dirname(SCRIPT), 'scripts', 'install-runtime-deps.js'),
+        path.join(scriptsDir, 'install-runtime-deps.js')
+      );
       fs.writeFileSync(
         path.join(binDir, 'npm'),
         `#!/usr/bin/env bash\nset -euo pipefail\nmkdir -p "$PWD/node_modules"\nprintf '%s\\n' "$PWD" > "$ECC_TEST_NPM_CWD"\n`,

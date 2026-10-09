@@ -524,6 +524,9 @@ else failed++;
   else failed++;
 
   const calStateDir = path.join(fixtureRoot, 'cal-state');
+  // These samples and expectations describe this specific hysteresis band,
+  // independently of the operator's current production defaults.
+  const calibrationEnv = { ECC_JEV_ACTIVATION_THRESHOLD: '0.65', ECC_JEV_DEACTIVATION_THRESHOLD: '0.35' };
   {
     // 12 routing-event rows: alpha flips 6x and sits mid-band on average, mid
     // never leaves the band, weak is locked on by explicit request twice, calm
@@ -548,7 +551,7 @@ else failed++;
 
   if (
     test('calibrate prints the table sorted by samples and the matching recommendations', () => {
-      const stdout = runOk(['calibrate', '--state-dir', calStateDir]);
+      const stdout = runOk(['calibrate', '--state-dir', calStateDir], calibrationEnv);
       assert.ok(stdout.includes('JEV switchboard calibrate — 12 routing events, 0 eval errors'), `summary line: ${stdout}`);
       const lines = stdout.split(/\r?\n/);
       const dataRows = lines.filter(line => /^ {2}skill:/.test(line));
@@ -570,7 +573,7 @@ else failed++;
 
   if (
     test('calibrate --json prints the summarizeCalibration output', () => {
-      const stdout = runOk(['calibrate', '--state-dir', calStateDir, '--json']);
+      const stdout = runOk(['calibrate', '--state-dir', calStateDir, '--json'], calibrationEnv);
       const summary = JSON.parse(stdout);
       assert.strictEqual(summary.events, 12);
       assert.strictEqual(summary.evalErrors, 0);
@@ -582,6 +585,20 @@ else failed++;
       const weak = summary.capabilities.find(entry => entry.id === 'skill:weak');
       assert.strictEqual(weak.explicitLocks, 2);
       assert.strictEqual(weak.lockedCount, 2);
+    })
+  ) passed++;
+  else failed++;
+
+  if (
+    test('calibrate uses current default thresholds when no override is configured', () => {
+      const summary = JSON.parse(runOk(['calibrate', '--state-dir', calStateDir, '--json']));
+      const alpha = summary.capabilities.find(entry => entry.id === 'skill:alpha');
+      const mid = summary.capabilities.find(entry => entry.id === 'skill:mid');
+      assert.strictEqual(alpha.bandCount, 3, '0.70, 0.75, and 0.80 sit in the default 0.49/0.85 band');
+      assert.strictEqual(mid.bandCount, 7, 'default boundaries exclude 0.49 and lower samples');
+      assert.strictEqual(summary.recommendations.length, 3);
+      assert.ok(!summary.recommendations.some(item => item.startsWith('review activation threshold for skill:alpha')),
+        'alpha mean 0.45 is below the current default band');
     })
   ) passed++;
   else failed++;
