@@ -22,6 +22,7 @@ Per routing event, Jev (TypeSafe AI System One model) estimates a relevance prob
 - ECC: yarn 4.9.2, node >=18 (v22.23.2 local), deps installed, test = validator chain + `node tests/run-all.js`.
 
 ## Pieces & rounds
+
 | # | Piece | Status | Round | Last critic verdict |
 |---|-------|--------|-------|---------------------|
 | 0 | Recon (ECC subsystems ×8 + Jev docs ×3 + gap-check) | **done** (12/12) | – | verdict: overlay-not-runtime; all integration seams verified |

@@ -602,11 +602,56 @@ async function runTests() {
   else failed++;
 
   if (
-    await test('CLI browser opener handles spawn errors', async () => {
-      const source = fs.readFileSync(SCRIPT, 'utf8');
+    await test('CLI browser opener reports launcher spawn errors without crashing', async () => {
+      // Isolate the spawn stub so other CLI/server tests keep the real launcher.
+      const script = [
+        "require('child_process').spawn = () => {",
+        "  const error = new Error('browser launcher denied');",
+        "  error.code = 'EACCES';",
+        '  throw error;',
+        '};',
+        `require(${JSON.stringify(SCRIPT)}).openBrowser('http://127.0.0.1:8000');`
+      ].join('\n');
+      const result = spawnSync(process.execPath, ['-e', script], {
+        encoding: 'utf8',
+        cwd: REPO_ROOT,
+        timeout: 5000
+      });
 
-      assert.match(source, /child\.on\('error'/);
-      assert.match(source, /child\.unref\(\)/);
+      assert.strictEqual(result.status, 0, result.stderr);
+      assert.strictEqual(result.stdout, '');
+      assert.match(result.stderr, /\[control-pane\] failed to open browser: spawn-threw:EACCES/);
+    })
+  )
+    passed++;
+  else failed++;
+
+  if (
+    await test('CLI browser opener detaches the child and handles asynchronous spawn errors', async () => {
+      const script = [
+        "const { EventEmitter } = require('events');",
+        'let unrefCalled = false;',
+        'let errorEmitted = false;',
+        "require('child_process').spawn = () => {",
+        '  const child = new EventEmitter();',
+        '  child.unref = () => { unrefCalled = true; };',
+        '  process.nextTick(() => {',
+        '    errorEmitted = true;',
+        "    child.emit('error', Object.assign(new Error('launcher denied'), { code: 'EACCES' }));",
+        '  });',
+        '  return child;',
+        '};',
+        `require(${JSON.stringify(SCRIPT)}).openBrowser('http://127.0.0.1:8000');`,
+        "process.on('beforeExit', () => console.log(JSON.stringify({ unrefCalled, errorEmitted })));"
+      ].join('\n');
+      const result = spawnSync(process.execPath, ['-e', script], {
+        encoding: 'utf8',
+        cwd: REPO_ROOT,
+        timeout: 5000
+      });
+
+      assert.strictEqual(result.status, 0, result.stderr);
+      assert.deepStrictEqual(JSON.parse(result.stdout), { unrefCalled: true, errorEmitted: true });
     })
   )
     passed++;
